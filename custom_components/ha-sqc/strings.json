@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "SeaQuaComp Setup",
+        "description": "Configure your SeaQuaComp device",
+        "data": {
+          "host": "Host (IP or domain)",
+          "pin": "PIN (4 digits)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the device. Please check the host address.",
+      "invalid_pin": "PIN must be exactly 4 digits.",
+      "unknown": "Unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "Device is already configured."
+    }
+  }
+}

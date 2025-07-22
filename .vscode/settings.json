@@ -1,0 +1,9 @@
+{
+    "python.analysis.extraPaths": [
+        "/home/igoro00/home-assistant/core"
+    ],
+    "python.autoComplete.extraPaths": ["/home/igoro00/home-assistant/core"],
+    "terminal.integrated.env.linux": {
+        "PYTHONPATH": "/home/igoro00/home-assistant/core"
+    }
+}
