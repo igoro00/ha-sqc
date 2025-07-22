@@ -83,3 +83,30 @@ class SQCPHControlBinarySensor(SQCBinarySensorBase):
         if "Sterowanie pH:  <b>OFF</b>" in html:
             return False
         return None
+    
+class SQCAlarmBinarySensor(SQCBinarySensorBase):
+    """ Alarm state for SQC."""
+
+    def __init__(
+        self,
+        coordinator: SQCDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+    ) -> None:
+        """Initialize the Alarm state."""
+        super().__init__(coordinator, config_entry, "alarm", "Alarm")
+
+    @property
+    def is_on(self):
+        """Return the state of the sensor."""
+        if not self.coordinator.data:
+            return None
+        
+        html = self.coordinator.data.get("html")
+        if not html:
+            _LOGGER.warning("No sensor data available")
+            return None
+        if "Sterowanie pH:  <b>ON</b>" in html:
+            return True
+        if "Sterowanie pH:  <b>OFF</b>" in html:
+            return False
+        return None
