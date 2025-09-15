@@ -11,6 +11,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from homeassistant.const import CONF_HOST, CONF_PIN
 
@@ -33,6 +34,8 @@ class SQCDataUpdateCoordinator(DataUpdateCoordinator):
         """Initialize."""
         self.host = config[CONF_HOST]
         self.pin = config[CONF_PIN]
+
+        self.session = async_get_clientsession(hass)
         
         super().__init__(
             hass,
@@ -81,38 +84,28 @@ class SQCDataUpdateCoordinator(DataUpdateCoordinator):
         }
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Update data via library."""
-        try:
-            async with asyncio.timeout(10):
-                return await self._fetch_data()
-        except Exception as exception:
-            raise UpdateFailed(f"Error communicating with API: {exception}") from exception
-
-    async def _fetch_data(self, iteration: int=0) -> dict[str, Any]:
-        """Fetch data from the API."""
         url = f"{self.host}/home"
         try:
-            if iteration > 5:
-                _LOGGER.info("Retrying fetch data, attempt %d", iteration)
-                raise UpdateFailed("Max retries reached")
-            _LOGGER.debug("Fetching data from %s", url)
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as res:
-                    if res.status == 200:
-                        data = await res.text()
-                        if "<!DOCTYPE html>" not in data:
-                            _LOGGER.error("Not logged in, trying to login")
-                            if not await self._login():
-                                raise UpdateFailed("Login failed, cannot fetch data")
-                            await asyncio.sleep(5)
-                            return await self._fetch_data(iteration + 1)
-                        _LOGGER.debug("Data fetched successfully")
-                        return {
-                            "html": data,
-                            "online": True,
-                            "last_updated": self.hass.loop.time(),
-                        }
-                    else:
-                        raise UpdateFailed(f"API returned status {res.status} for {url}")
-        except Exception as err:
-            raise UpdateFailed(f"Error fetching data from {self.host}: {err}")
+            async with self.session.get(
+                url, timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                if resp.status != 200:
+                    raise UpdateFailed(f"Bad status {resp.status}")
+
+                data = await resp.text()
+                if "<!DOCTYPE html>" not in data:
+                    _LOGGER.warning("Not logged in, trying to login")
+                    if not await self._login():
+                        raise UpdateFailed("Login failed")
+                    # zalogowane – poczekaj chwilę i od razu spróbuj
+                    await asyncio.sleep(1)
+                    return await self._async_update_data()
+
+                return {
+                    "html": data,
+                    "online": True,
+                    "last_updated": self.hass.loop.time(),
+                }
+
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            raise UpdateFailed(f"Comm error with {self.host}: {err}") from err
