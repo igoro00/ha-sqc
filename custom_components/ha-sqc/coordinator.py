@@ -104,6 +104,7 @@ class SQCDataUpdateCoordinator(DataUpdateCoordinator):
                             _LOGGER.error("Not logged in, trying to login")
                             if not await self._login():
                                 raise UpdateFailed("Login failed, cannot fetch data")
+                            await asyncio.sleep(5)
                             return await self._fetch_data(iteration + 1)
 
                         return {
@@ -116,7 +117,7 @@ class SQCDataUpdateCoordinator(DataUpdateCoordinator):
                             "API returned status %s for %s", res.status, url
                         )
                         return {
-                            "html": {},
+                            "html": "",
                             "online": False,
                             "last_updated": self.hass.loop.time(),
                         }
@@ -124,7 +125,7 @@ class SQCDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception as err:
             _LOGGER.error("Error fetching data from %s: %s", self.host, err)
             return {
-                "html": {},
+                "html": "",
                 "online": False,
                 "last_updated": self.hass.loop.time(),
                 "error": str(err),
