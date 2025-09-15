@@ -106,27 +106,13 @@ class SQCDataUpdateCoordinator(DataUpdateCoordinator):
                                 raise UpdateFailed("Login failed, cannot fetch data")
                             await asyncio.sleep(5)
                             return await self._fetch_data(iteration + 1)
-
+                        _LOGGER.debug("Data fetched successfully")
                         return {
                             "html": data,
                             "online": True,
                             "last_updated": self.hass.loop.time(),
                         }
                     else:
-                        _LOGGER.warning(
-                            "API returned status %s for %s", res.status, url
-                        )
-                        return {
-                            "html": "",
-                            "online": False,
-                            "last_updated": self.hass.loop.time(),
-                        }
-                    
+                        raise UpdateFailed(f"API returned status {res.status} for {url}")
         except Exception as err:
-            _LOGGER.error("Error fetching data from %s: %s", self.host, err)
-            return {
-                "html": "",
-                "online": False,
-                "last_updated": self.hass.loop.time(),
-                "error": str(err),
-            }
+            raise UpdateFailed(f"Error fetching data from {self.host}: {err}")
