@@ -1,7 +1,7 @@
 {
   "domain": "ha-sqc",
   "name": "SeaQuaComp",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "codeowners": ["igoro00"],
   "documentation": "https://github.com/igoro00/ha-sqc",
   "iot_class": "local_polling",

@@ -19,6 +19,9 @@ from .const import DOMAIN, DEFAULT_SCAN_INTERVAL
 
 from types import MappingProxyType
 
+from aiohttp.http_exceptions import BadHttpMessage
+
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,25 +47,20 @@ class SQCDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
     
-    async def _login(self) -> bool:
+    async def _login(self) -> None:
         """Login to the SQC API with pin"""
-        try:
-            url = f"{self.host}"
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, data={"pin": self.pin}, timeout=aiohttp.ClientTimeout(total=10)) as res:
-                    if res.status == 200:
-                        text = await res.text()
-                        if "PIN prawidłowy" in text:
-                            _LOGGER.info("Login successful")
-                            return True
-                    else:
-                        text = await res.text()
-                        _LOGGER.error("Login failed: %s", text)
-        except Exception as e:
-            _LOGGER.error("Error logging in: %s", e)
-        finally:
-            return False
-    
+
+        url = f"{self.host}"
+        async with self.session.post(url, data={"pin": self.pin}, timeout=aiohttp.ClientTimeout(total=10)) as res:
+            if res.status == 200:
+                text = await res.text()
+                if "PIN prawidłowy" in text:
+                    _LOGGER.info("Login successful")
+                    await asyncio.sleep(1)
+                else:
+                    text = await res.text()
+                    raise UpdateFailed(f"Login failed: {text}")
+        
     def _get_device_name(self) -> str:
         """Extract device name from HTML."""
         if self.data is not None:
@@ -94,18 +92,21 @@ class SQCDataUpdateCoordinator(DataUpdateCoordinator):
 
                 data = await resp.text()
                 if "<!DOCTYPE html>" not in data:
-                    _LOGGER.warning("Not logged in, trying to login")
-                    if not await self._login():
-                        raise UpdateFailed("Login failed")
-                    # zalogowane – poczekaj chwilę i od razu spróbuj
-                    await asyncio.sleep(1)
-                    return await self._async_update_data()
+                    raise BadHttpMessage("Not logged in")
 
                 return {
                     "html": data,
                     "online": True,
                     "last_updated": self.hass.loop.time(),
                 }
-
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+        except BadHttpMessage as err:
+            _LOGGER.warning("Not logged in, trying to login")
+            await self._login()
+            return await self._async_update_data()
+        except aiohttp.ClientConnectorError as err:
+            # host całkowicie niedostępny (np. odłączony od prądu)
+            raise UpdateFailed(f"Host {self.host} not reachable: {err}") from err
+        except asyncio.TimeoutError:
+            raise UpdateFailed(f"Timeout while fetching from {self.host}")
+        except aiohttp.ClientError as err:
             raise UpdateFailed(f"Comm error with {self.host}: {err}") from err
