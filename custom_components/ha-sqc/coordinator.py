@@ -109,4 +109,8 @@ class SQCDataUpdateCoordinator(DataUpdateCoordinator):
         except asyncio.TimeoutError:
             raise UpdateFailed(f"Timeout while fetching from {self.host}")
         except aiohttp.ClientError as err:
+            if "Expected HTTP/" in str(err):
+                _LOGGER.warning("Not logged in, trying to login")
+                await self._login()
+                return await self._async_update_data()
             raise UpdateFailed(f"Comm error with {self.host}: {err}") from err
